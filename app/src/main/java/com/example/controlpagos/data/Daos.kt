@@ -12,6 +12,9 @@ interface CicloDao {
     @Query("SELECT * FROM ciclos ORDER BY id DESC")
     fun observarTodos(): Flow<List<Ciclo>>
 
+    @Query("SELECT * FROM ciclos WHERE id = :id")
+    fun observarId(id: Long): Flow<Ciclo?>
+
     @Insert
     suspend fun insertar(ciclo: Ciclo): Long
 

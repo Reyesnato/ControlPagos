@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.controlpagos.ui.AppNavigation
 import com.example.controlpagos.ui.CiclosScreen
 import com.example.controlpagos.ui.theme.ControlPagosTheme
 
@@ -20,7 +21,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ControlPagosTheme {
-                CiclosScreen(onCicloClick = { /* después navegamos a los grupos */ })
+                AppNavigation()
             }        }
     }
 }
