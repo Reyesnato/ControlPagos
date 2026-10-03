@@ -26,9 +26,16 @@ fun AppNavigation() {
             GruposScreen(
                 onVolver = { navController.popBackStack() },
                 onGrupoClick = { grupoId ->
-                    //tabla de pagos
+                    navController.navigate("tabla/$grupoId")
                 }
             )
+        }
+
+        composable(
+            route = "tabla/{grupoId}",
+            arguments = listOf(navArgument("grupoId") { type = NavType.LongType})
+        ) {
+            TablaScreen(onVolver = { navController.popBackStack()})
         }
 
     }

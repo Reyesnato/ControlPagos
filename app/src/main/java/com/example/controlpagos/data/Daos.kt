@@ -30,6 +30,9 @@ interface GrupoDao {
     @Query("SELECT * FROM grupos WHERE cicloId = :cicloId ORDER BY id")
     fun observarPorCiclo(cicloId: Long): Flow<List<Grupo>>
 
+    @Query("SELECT * FROM grupos WHERE id = :id")
+    fun observarId(id: Long): Flow<Grupo?>
+
     @Insert
     suspend fun insertar(grupo: Grupo): Long
 
@@ -42,7 +45,7 @@ interface GrupoDao {
 
 @Dao
 interface AlumnoDao {
-    @Query("SELECT * FROM alumnos WHERE grupoId = :grupoId ORDER BY nombre")
+    @Query("SELECT * FROM alumnos WHERE grupoId = :grupoId ORDER BY id")
     fun observarPorGrupo(grupoId: Long): Flow<List<Alumno>>
 
     @Insert
