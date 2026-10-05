@@ -5,7 +5,11 @@ fun formatoMonto(centavos: Long): String =
     else "\$${centavos / 100}.${"%02d".format(centavos % 100)}"
 
 fun montoACentavos(texto: String): Long? {
-    val numero = texto.trim().replace(",",".").toBigDecimalOrNull() ?: return null
+    val numero = texto.trim().replace(",", ".").toBigDecimalOrNull() ?: return null
     if (numero.signum() <= 0) return null
     return numero.movePointRight(2).toLong()
 }
+
+fun centavosATexto(centavos: Long): String =
+    if (centavos % 100 == 0L) "${centavos / 100}"
+    else "${centavos / 100}.${"%02d".format(centavos % 100)}"

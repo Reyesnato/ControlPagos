@@ -1,7 +1,9 @@
 package com.example.controlpagos.ui
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,6 +46,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.controlpagos.data.Abono
+import com.example.controlpagos.data.Alumno
+import com.example.controlpagos.data.Concepto
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val AnchoNombre = 140.dp
 private val AnchoCelda = 100.dp
@@ -60,6 +69,7 @@ fun TablaScreen(
 
     var mostrarAlumno by remember { mutableStateOf(false) }
     var mostrarConcepto by remember { mutableStateOf(false) }
+    var celdaSeleccionada by remember { mutableStateOf<Pair<Long, Long>?>(null) }
 
     Scaffold(
         topBar = {
@@ -94,7 +104,12 @@ fun TablaScreen(
                     Text("Agrega alumnos y conceptos para empezar.")
                 }
             } else {
-                TablaPagos(tabla)
+                TablaPagos(
+                    tabla = tabla,
+                    onCeldaClick = { alumnoId, conceptoId ->
+                        celdaSeleccionada = alumnoId to conceptoId
+                    }
+                )
             }
         }
     }
@@ -114,10 +129,29 @@ fun TablaScreen(
             mostrarConcepto = false
         }, onCancelar = { mostrarConcepto = false })
     }
+    celdaSeleccionada?.let { (alumnoId, conceptoId) ->
+        val fila = tabla.filas.find { it.alumno.id == alumnoId }
+        val concepto = tabla.conceptos.find { it.id == conceptoId }
+        if (fila != null && concepto != null) {
+            val historial by remember(alumnoId, conceptoId) {
+                vm.abonosDeCelda(alumnoId, conceptoId)
+            }.collectAsStateWithLifecycle(initialValue = emptyList())
+
+            DialogoAbono(
+                alumno = fila.alumno,
+                concepto = concepto,
+                abonado = fila.abonado[conceptoId] ?: 0L,
+                historial = historial,
+                onAbonar = { vm.agregarAbono(alumnoId, conceptoId, it) },
+                onEliminarAbono = { vm.eliminarAbono(it) },
+                onCerrar = { celdaSeleccionada = null }
+            )
+        }
+    }
 }
 
 @Composable
-private fun TablaPagos(tabla: TablaUiState) {
+private fun TablaPagos(tabla: TablaUiState, onCeldaClick: (Long, Long) -> Unit) {
     val scrollHorizontal = rememberScrollState()
 
     Row(
@@ -180,7 +214,8 @@ private fun TablaPagos(tabla: TablaUiState) {
                             modifier = Modifier
                                 .width(AnchoCelda)
                                 .height(AltoFila),
-                            fondo = if (completo) VerdePagado else Color.Transparent
+                            fondo = if (completo) VerdePagado else Color.Transparent,
+                            onClick = { onCeldaClick(fila.alumno.id, concepto.id) }
                         ) {
                             if (abonado > 0) {
                                 Text(
@@ -201,12 +236,14 @@ private fun Celda(
     modifier: Modifier,
     fondo: Color = Color.Transparent,
     alineacion: Alignment = Alignment.Center,
+    onClick: (() -> Unit)? = null,
     contenido: @Composable () -> Unit
 ) {
     Box(
         modifier = modifier
             .background(fondo)
             .border(0.5.dp, MaterialTheme.colorScheme.outline)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         contentAlignment = alineacion
     ) {
@@ -220,24 +257,24 @@ private fun DialogoConcepto(
     onCancelar: () -> Unit
 ) {
     var nombre by remember { mutableStateOf("") }
-    var precio by remember {mutableStateOf("")}
+    var precio by remember { mutableStateOf("") }
     val centavos = montoACentavos(precio)
 
     AlertDialog(
         onDismissRequest = onCancelar,
-        title = {Text("Nuevo concepto")},
+        title = { Text("Nuevo concepto") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = nombre,
-                    onValueChange = {nombre = it},
-                    label = {Text("Concepto (ej. Camisas)")},
+                    onValueChange = { nombre = it },
+                    label = { Text("Concepto (ej. Camisas)") },
                     singleLine = true
                 )
                 OutlinedTextField(
                     value = precio,
-                    onValueChange = {precio = it},
-                    label = {Text("Precio (ej.300)")},
+                    onValueChange = { precio = it },
+                    label = { Text("Precio (ej. 300)") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                 )
@@ -245,12 +282,87 @@ private fun DialogoConcepto(
         },
         confirmButton = {
             TextButton(
-                onClick = { centavos?.let { onConfirmar(nombre, it) }},
+                onClick = { centavos?.let { onConfirmar(nombre, it) } },
                 enabled = nombre.isNotBlank() && centavos != null
             ) { Text("Guardar") }
         },
         dismissButton = {
             TextButton(onClick = onCancelar) { Text("Cancelar") }
+        }
+    )
+}
+
+@Composable
+private fun DialogoAbono(
+    alumno: Alumno,
+    concepto: Concepto,
+    abonado: Long,
+    historial: List<Abono>,
+    onAbonar: (Long) -> Unit,
+    onEliminarAbono: (Abono) -> Unit,
+    onCerrar: () -> Unit
+) {
+    var cantidad by remember { mutableStateOf("") }
+    val centavos = montoACentavos(cantidad)
+    val falta = (concepto.montoCentavos - abonado).coerceAtLeast(0L)
+    val formatoFecha = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text(alumno.nombre) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "${concepto.nombre} · ${formatoMonto(concepto.montoCentavos)}",
+                    fontWeight = FontWeight.Bold
+                )
+                Text("Abonado: ${formatoMonto(abonado)}")
+                Text(if (falta == 0L) "Pagado completo" else "Falta: ${formatoMonto(falta)}")
+
+                OutlinedTextField(
+                    value = cantidad,
+                    onValueChange = { cantidad = it },
+                    label = { Text("Cantidad a abonar") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+                if (falta > 0L) {
+                    TextButton(onClick = { cantidad = centavosATexto(falta) }) {
+                        Text("Completar (${formatoMonto(falta)})")
+                    }
+                }
+
+                if (historial.isNotEmpty()) {
+                    Text("Historial", fontWeight = FontWeight.Bold)
+                    historial.forEach { abono ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = formatoFecha.format(Date(abono.fecha)),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(formatoMonto(abono.cantidadCentavos))
+                            IconButton(onClick = { onEliminarAbono(abono) }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Eliminar abono")
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { centavos?.let { onAbonar(it); cantidad = "" } },
+                enabled = centavos != null
+            ){Text("Abonar")}
+                        },
+        dismissButton = {
+            TextButton(onClick = onCerrar) { Text("Cerrar") }
         }
     )
 }

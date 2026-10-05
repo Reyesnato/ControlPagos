@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.example.controlpagos.data.Abono
 import com.example.controlpagos.data.Alumno
 import com.example.controlpagos.data.AppDatabase
 import com.example.controlpagos.data.Concepto
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
 
 //Fila del alumno y abono por concepto
 data class FilaPago(
@@ -72,5 +74,20 @@ class TablaViewModel(
                 Concepto(grupoId = grupoId, nombre = limpio, montoCentavos = montoCentavos)
             )
         }
+    }
+    fun abonosDeCelda(alumnoId: Long, conceptoId: Long): Flow<List<Abono>> =
+        db.abonoDao().observarPorCelda(alumnoId, conceptoId)
+
+    fun agregarAbono(alumnoId: Long, conceptoId: Long, centavos: Long) {
+        if (centavos <= 0) return
+        viewModelScope.launch {
+            db.abonoDao().insertar(
+                Abono(alumnoId = alumnoId, conceptoId = conceptoId, cantidadCentavos = centavos)
+            )
+        }
+    }
+
+    fun eliminarAbono(abono: Abono) {
+        viewModelScope.launch { db.abonoDao().eliminar(abono) }
     }
 }
