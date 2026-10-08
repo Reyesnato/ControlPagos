@@ -26,6 +26,7 @@ data class TablaUiState(
     val conceptos: List<Concepto> = emptyList(),
     val filas: List<FilaPago> = emptyList()
 )
+
 class TablaViewModel(
     app: Application,
     savedStateHandle: SavedStateHandle
@@ -59,13 +60,14 @@ class TablaViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TablaUiState())
 
-    fun agregarAlumno(nombre: String){
+    fun agregarAlumno(nombre: String) {
         val limpio = nombre.trim()
         if (limpio.isEmpty()) return
         viewModelScope.launch {
             db.alumnoDao().insertar(Alumno(grupoId = grupoId, nombre = limpio))
         }
     }
+
     fun agregarConcepto(nombre: String, montoCentavos: Long) {
         val limpio = nombre.trim()
         if (limpio.isEmpty() || montoCentavos <= 0) return
@@ -75,6 +77,7 @@ class TablaViewModel(
             )
         }
     }
+
     fun abonosDeCelda(alumnoId: Long, conceptoId: Long): Flow<List<Abono>> =
         db.abonoDao().observarPorCelda(alumnoId, conceptoId)
 
@@ -89,5 +92,31 @@ class TablaViewModel(
 
     fun eliminarAbono(abono: Abono) {
         viewModelScope.launch { db.abonoDao().eliminar(abono) }
+    }
+
+    fun editarAlumno(alumno: Alumno, nuevoNombre: String) {
+        val limpio = nuevoNombre.trim()
+        if (limpio.isEmpty()) return
+        viewModelScope.launch { db.alumnoDao().actualizar(alumno.copy(nombre = limpio)) }
+
+    }
+
+    fun eliminarAlumno(alumno: Alumno) {
+        viewModelScope.launch { db.alumnoDao().eliminar(alumno) }
+    }
+
+    fun editarConcepto(concepto: Concepto, nuevoNombre: String, nuevoMontoCentavos: Long) {
+        val limpio = nuevoNombre.trim()
+        if (limpio.isEmpty() || nuevoMontoCentavos <= 0) return
+        viewModelScope.launch {
+            db.conceptoDao().actualizar(
+                concepto.copy(nombre = limpio, montoCentavos = nuevoMontoCentavos)
+            )
+        }
+    }
+
+    fun eliminarConcepto(concepto: Concepto) {
+        viewModelScope.launch { db.conceptoDao().eliminar(concepto) }
+
     }
 }

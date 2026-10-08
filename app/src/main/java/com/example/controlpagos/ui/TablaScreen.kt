@@ -70,6 +70,10 @@ fun TablaScreen(
     var mostrarAlumno by remember { mutableStateOf(false) }
     var mostrarConcepto by remember { mutableStateOf(false) }
     var celdaSeleccionada by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    var alumnoEditar by remember { mutableStateOf<Alumno?>(null) }
+    var alumnoEliminar by remember { mutableStateOf<Alumno?>(null) }
+    var conceptoEditar by remember { mutableStateOf<Concepto?>(null) }
+    var conceptoEliminar by remember { mutableStateOf<Concepto?>(null) }
 
     Scaffold(
         topBar = {
@@ -108,7 +112,9 @@ fun TablaScreen(
                     tabla = tabla,
                     onCeldaClick = { alumnoId, conceptoId ->
                         celdaSeleccionada = alumnoId to conceptoId
-                    }
+                    },
+                    onAlumnoClick = { alumnoEditar = it },
+                    onConceptoClick = { conceptoEditar = it }
                 )
             }
         }
@@ -148,10 +154,54 @@ fun TablaScreen(
             )
         }
     }
+
+    alumnoEditar?.let { alumno ->
+        DialogoAlumno(
+            alumno = alumno,
+            onGuardar = { vm.editarAlumno(alumno, it); alumnoEditar = null },
+            onEliminar = { alumnoEliminar = alumno; alumnoEditar = null },
+            onCancelar = { alumnoEditar = null }
+        )
+    }
+
+    alumnoEliminar?.let { alumno ->
+        DialogoConfirmarEliminar(
+            mensaje = "Se borrará a \"${alumno.nombre}\" y todos sus abonos. Esta acción no se puede deshacer.",
+            onConfirmar = { vm.eliminarAlumno(alumno); alumnoEliminar = null },
+            onCancelar = { alumnoEliminar = null }
+        )
+    }
+
+    conceptoEditar?.let { concepto ->
+        DialogoConcepto(
+            titulo = "Editar concepto",
+            nombreInicial = concepto.nombre,
+            precioInicial = centavosATexto(concepto.montoCentavos),
+            onConfirmar = { nombre, centavos ->
+                vm.editarConcepto(concepto, nombre, centavos)
+                conceptoEditar = null
+            },
+            onCancelar = { conceptoEditar = null },
+            onEliminar = { conceptoEliminar = concepto; conceptoEditar = null }
+        )
+    }
+
+    conceptoEliminar?.let { concepto ->
+        DialogoConfirmarEliminar(
+            mensaje = "Se borrará \"${concepto.nombre}\" y los abonos de todos los alumnos en ese concepto. Esta acción no se puede deshacer.",
+            onConfirmar = { vm.eliminarConcepto(concepto); conceptoEliminar = null },
+            onCancelar = { conceptoEliminar = null }
+        )
+    }
 }
 
 @Composable
-private fun TablaPagos(tabla: TablaUiState, onCeldaClick: (Long, Long) -> Unit) {
+private fun TablaPagos(
+    tabla: TablaUiState,
+    onCeldaClick: (Long, Long) -> Unit,
+    onAlumnoClick: (Alumno) -> Unit,
+    onConceptoClick: (Concepto) -> Unit
+) {
     val scrollHorizontal = rememberScrollState()
 
     Row(
@@ -159,7 +209,6 @@ private fun TablaPagos(tabla: TablaUiState, onCeldaClick: (Long, Long) -> Unit) 
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-
         Column {
             Celda(
                 Modifier
@@ -173,7 +222,8 @@ private fun TablaPagos(tabla: TablaUiState, onCeldaClick: (Long, Long) -> Unit) 
                     modifier = Modifier
                         .width(AnchoNombre)
                         .height(AltoFila),
-                    alineacion = Alignment.CenterStart
+                    alineacion = Alignment.CenterStart,
+                    onClick = { onAlumnoClick(fila.alumno) }
                 ) {
                     Text(fila.alumno.nombre, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
@@ -191,7 +241,8 @@ private fun TablaPagos(tabla: TablaUiState, onCeldaClick: (Long, Long) -> Unit) 
                     Celda(
                         Modifier
                             .width(AnchoCelda)
-                            .height(AltoEncabezado)
+                            .height(AltoEncabezado),
+                        onClick = { onConceptoClick(concepto) }
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(formatoMonto(concepto.montoCentavos), fontWeight = FontWeight.Bold)
@@ -253,16 +304,20 @@ private fun Celda(
 
 @Composable
 private fun DialogoConcepto(
+    titulo: String = "Nuevo concepto",
+    nombreInicial: String = "",
+    precioInicial: String = "",
     onConfirmar: (String, Long) -> Unit,
-    onCancelar: () -> Unit
+    onCancelar: () -> Unit,
+    onEliminar: (() -> Unit)? = null
 ) {
-    var nombre by remember { mutableStateOf("") }
-    var precio by remember { mutableStateOf("") }
+    var nombre by remember { mutableStateOf(nombreInicial) }
+    var precio by remember { mutableStateOf(precioInicial) }
     val centavos = montoACentavos(precio)
 
     AlertDialog(
         onDismissRequest = onCancelar,
-        title = { Text("Nuevo concepto") },
+        title = { Text(titulo) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -278,6 +333,11 @@ private fun DialogoConcepto(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                 )
+                if (onEliminar != null) {
+                    TextButton(onClick = onEliminar) {
+                        Text("Eliminar concepto", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         },
         confirmButton = {
@@ -359,10 +419,65 @@ private fun DialogoAbono(
             TextButton(
                 onClick = { centavos?.let { onAbonar(it); cantidad = "" } },
                 enabled = centavos != null
-            ){Text("Abonar")}
-                        },
+            ) { Text("Abonar") }
+        },
         dismissButton = {
             TextButton(onClick = onCerrar) { Text("Cerrar") }
+        }
+    )
+}
+
+@Composable
+private fun DialogoAlumno(
+    alumno: Alumno,
+    onGuardar: (String) -> Unit,
+    onEliminar: () -> Unit,
+    onCancelar: () -> Unit
+) {
+    var nombre by remember {mutableStateOf(alumno.nombre)}
+
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = {Text("Editar alumno")},
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = {nombre = it},
+                    label = {Text("Nombre")},
+                    singleLine = true
+                )
+                TextButton(onClick = onEliminar) {
+                    Text("Eliminar alumno", color= MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {onGuardar(nombre)},
+                enabled = nombre.isNotBlank()
+            ) { Text("Guardar")}
+        },
+        dismissButton = {
+            TextButton(onClick = onCancelar) { Text("Cancelar")}
+        }
+    )
+}
+@Composable
+private fun DialogoConfirmarEliminar(
+    mensaje: String,
+    onConfirmar: () -> Unit,
+    onCancelar: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text("Confirmar eliminación") },
+        text = { Text(mensaje) },
+        confirmButton = {
+            TextButton(onClick = onConfirmar) { Text("Eliminar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancelar) { Text("Cancelar") }
         }
     )
 }
