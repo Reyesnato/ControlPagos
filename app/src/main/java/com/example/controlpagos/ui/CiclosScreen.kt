@@ -37,6 +37,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.controlpagos.data.Ciclo
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,9 +61,59 @@ fun CiclosScreen(
     var mostrarAgregar by remember { mutableStateOf(false) }
     var cicloAEditar by remember { mutableStateOf<Ciclo?>(null) }
     var cicloAEliminar by remember { mutableStateOf<Ciclo?>(null) }
+    val mensaje by vm.mensaje.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var menuAbierto by remember { mutableStateOf(false) }
+    var uriAImportar by remember { mutableStateOf<Uri?>(null) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { vm.exportar(it) } }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) uriAImportar = uri }
+
+    LaunchedEffect(mensaje) {
+        mensaje?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.mensajeMostrado()
+        }
+    }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Ciclos") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Ciclos") },
+                actions = {
+                    IconButton(onClick = { menuAbierto = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones")
+                    }
+                    DropdownMenu(
+                        expanded = menuAbierto,
+                        onDismissRequest = { menuAbierto = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Exportar respaldo") },
+                            onClick = {
+                                menuAbierto = false
+                                val fecha = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                    .format(Date())
+                                exportLauncher.launch("respaldo_pagos_$fecha.json")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Importar respaldo") },
+                            onClick = {
+                                menuAbierto = false
+                                importLauncher.launch(arrayOf("*/*"))
+                            }
+                        )
+                    }
+                }
+            )
+        },
+        snackbarHost = {SnackbarHost(snackbarHostState)},
         floatingActionButton = {
             FloatingActionButton(onClick = { mostrarAgregar = true }) {
                 Icon(Icons.Filled.Add, contentDescription = "Agregar ciclo")
@@ -110,13 +172,13 @@ fun CiclosScreen(
         }
     }
 
-    if (mostrarAgregar){
+    if (mostrarAgregar) {
         DialogoNombre(
             titulo = "Nuevo ciclo",
             etiqueta = "Nombre (ej. 2026 B)",
             textoInicial = "",
-            onConfirmar = { vm.agregar(it); mostrarAgregar = false},
-            onCancelar = {mostrarAgregar = false}
+            onConfirmar = { vm.agregar(it); mostrarAgregar = false },
+            onCancelar = { mostrarAgregar = false }
         )
     }
 
@@ -125,15 +187,15 @@ fun CiclosScreen(
             titulo = "Editar ciclo",
             etiqueta = "Nombre",
             textoInicial = ciclo.nombre,
-            onConfirmar = { vm.renombrar(ciclo, it); cicloAEditar = null},
-            onCancelar = {cicloAEditar = null}
+            onConfirmar = { vm.renombrar(ciclo, it); cicloAEditar = null },
+            onCancelar = { cicloAEditar = null }
         )
     }
 
     cicloAEliminar?.let { ciclo ->
         AlertDialog(
-            onDismissRequest = {cicloAEliminar = null},
-            title = { Text("Eliminar ciclo")},
+            onDismissRequest = { cicloAEliminar = null },
+            title = { Text("Eliminar ciclo") },
             text = {
                 Text("Se borrarán \"${ciclo.nombre}\" y todos sus grupos, alumnos, conceptos y abonos. Esta acción no se puede deshacer.")
             },
@@ -143,7 +205,25 @@ fun CiclosScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { cicloAEliminar = null}) {Text("Cancelar")}
+                TextButton(onClick = { cicloAEliminar = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    uriAImportar?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { uriAImportar = null },
+            title = { Text("Importar respaldo") },
+            text = {
+                Text("Se reemplazarán TODOS los datos actuales (ciclos, grupos, alumnos, conceptos y abonos) por los del archivo. Esta acción no se puede deshacer.")
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.importar(uri); uriAImportar = null }) {
+                    Text("Reemplazar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { uriAImportar = null }) { Text("Cancelar") }
             }
         )
     }
@@ -156,25 +236,25 @@ fun DialogoNombre(
     textoInicial: String,
     onConfirmar: (String) -> Unit,
     onCancelar: () -> Unit
-){
-    var  texto by remember { mutableStateOf(textoInicial) }
+) {
+    var texto by remember { mutableStateOf(textoInicial) }
 
     AlertDialog(
         onDismissRequest = onCancelar,
-        title = { Text(titulo)},
+        title = { Text(titulo) },
         text = {
             OutlinedTextField(
                 value = texto,
                 onValueChange = { texto = it },
-                label = {Text(etiqueta)},
+                label = { Text(etiqueta) },
                 singleLine = true
             )
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirmar(texto)},
+                onClick = { onConfirmar(texto) },
                 enabled = texto.isNotBlank()
-            ) { Text("Guardar")}
+            ) { Text("Guardar") }
         },
         dismissButton = {
             TextButton(onClick = onCancelar) { Text("Cancelar") }

@@ -102,3 +102,43 @@ interface AbonoDao {
     @Delete
     suspend fun eliminar(abono: Abono)
 }
+
+@Dao
+interface RespaldoDao {
+    @Query("SELECT * FROM ciclos")
+    suspend fun ciclos(): List<Ciclo>
+
+    @Query("SELECT * FROM grupos")
+    suspend fun grupos(): List<Grupo>
+
+    @Query("SELECT * FROM alumnos")
+    suspend fun alumnos(): List<Alumno>
+
+    @Query("SELECT * FROM conceptos")
+    suspend fun conceptos(): List<Concepto>
+
+    @Query("SELECT * FROM abonos")
+    suspend fun abonos(): List<Abono>
+
+
+
+    //Borrar ciclos borra lo demás
+
+    @Query("DELETE FROM ciclos")
+    suspend fun borrarTodo()
+
+    @Insert
+    suspend fun insertarCiclos(lista: List<Ciclo>)
+
+    @Insert
+    suspend fun insertarGrupos(lista: List<Grupo>)
+
+    @Insert
+    suspend fun insertarAlumnos(lista: List<Alumno>)
+
+    @Insert
+    suspend fun insertarConceptos(lista: List<Concepto>)
+
+    @Insert
+    suspend fun insertarAbonos(lista: List<Abono>)
+}

@@ -18,6 +18,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun alumnoDao(): AlumnoDao
     abstract fun conceptoDao(): ConceptoDao
     abstract fun abonoDao(): AbonoDao
+    abstract fun respaldoDao(): RespaldoDao
 
     companion object {
         @Volatile
