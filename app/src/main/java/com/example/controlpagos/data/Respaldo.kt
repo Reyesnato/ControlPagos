@@ -24,7 +24,7 @@ object Respaldo {
             dao.grupos().forEach {
                 arr.put(
                     JSONObject().put("id", it.id).put("cicloId", it.cicloId)
-                        .put("nombre", it.nombre)
+                        .put("nombre", it.nombre).put("color", it.color)
                 )
             }
         })
@@ -69,7 +69,10 @@ object Respaldo {
             Ciclo(it.getLong("id"), it.getString("nombre"))
         }
         val grupos = raiz.getJSONArray("grupos").mapear {
-            Grupo(it.getLong("id"), it.getLong("cicloId"), it.getString("nombre"))
+            Grupo(
+                it.getLong("id"), it.getLong("cicloId"), it.getString("nombre"),
+                if (it.isNull("color")) null else it.getInt("color")
+            )
         }
         val alumnos = raiz.getJSONArray("alumnos").mapear {
             Alumno(it.getLong("id"), it.getLong("grupoId"), it.getString("nombre"))

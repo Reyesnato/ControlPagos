@@ -23,7 +23,8 @@ data class Ciclo(
 data class Grupo(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val cicloId: Long,
-    val nombre: String
+    val nombre: String,
+    val color: Int? = null
 )
 
 @Entity(

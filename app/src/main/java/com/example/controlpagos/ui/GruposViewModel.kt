@@ -45,4 +45,12 @@ class GruposViewModel(
     fun eliminar(grupo: Grupo) {
         viewModelScope.launch { grupoDao.eliminar(grupo) }
     }
+
+    fun editar(grupo: Grupo, nuevoNombre: String, nuevoColor: Int?){
+        val limpio = nuevoNombre.trim()
+        if (limpio.isEmpty()) return
+        viewModelScope.launch {
+            grupoDao.actualizar(grupo.copy(nombre = limpio, color = nuevoColor))
+        }
+    }
 }
