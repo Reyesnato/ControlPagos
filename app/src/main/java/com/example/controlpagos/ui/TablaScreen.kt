@@ -54,6 +54,14 @@ import com.example.controlpagos.data.Concepto
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 
 private val AnchoNombre = 140.dp
 private val AnchoCelda = 100.dp
@@ -76,15 +84,72 @@ fun TablaScreen(
     var alumnoEliminar by remember { mutableStateOf<Alumno?>(null) }
     var conceptoEditar by remember { mutableStateOf<Concepto?>(null) }
     var conceptoEliminar by remember { mutableStateOf<Concepto?>(null) }
+    val mensaje by vm.mensaje.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var menuAbierto by remember { mutableStateOf(false) }
+
+    val pdfLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri -> uri?.let { vm.exportarPdf(it) } }
+
+    val excelLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    ) { uri -> uri?.let { vm.exportarExcel(it) } }
+
+    LaunchedEffect(mensaje) {
+        mensaje?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.mensajeMostrado()
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(nombreGrupo) }, navigationIcon = {
-                IconButton(onClick = onVolver) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            TopAppBar(
+                title = { Text(nombreGrupo) },
+                navigationIcon = {
+                    IconButton(onClick = onVolver) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { menuAbierto = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones")
+                    }
+                    DropdownMenu(
+                        expanded = menuAbierto,
+                        onDismissRequest = { menuAbierto = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Exportar PDF") },
+                            onClick = {
+                                menuAbierto = false
+                                val fecha = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                    .format(Date())
+                                val nombreArchivo = nombreGrupo
+                                    .replace(Regex("[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ]+"), "_")
+                                pdfLauncher.launch("pagos_${nombreArchivo}_$fecha.pdf")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Exportar Excel") },
+                            onClick = {
+                                menuAbierto = false
+                                val fecha = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                    .format(Date())
+                                val nombreArchivo = nombreGrupo
+                                    .replace(Regex("[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ]+"), "_")
+                                excelLauncher.launch("pagos_${nombreArchivo}_$fecha.xlsx")
+                            }
+                        )
+                    }
                 }
-            })
-        }) { padding ->
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

@@ -15,8 +15,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
-//Fila del alumno y abono por concepto
 data class FilaPago(
     val alumno: Alumno,
     val abonado: Map<Long, Long>
@@ -118,5 +122,44 @@ class TablaViewModel(
     fun eliminarConcepto(concepto: Concepto) {
         viewModelScope.launch { db.conceptoDao().eliminar(concepto) }
 
+    }
+
+    private val _mensaje = MutableStateFlow<String?>(null)
+    val mensaje: StateFlow<String?> = _mensaje.asStateFlow()
+
+    fun mensajeMostrado() {
+        _mensaje.value = null
+    }
+
+    fun exportarPdf(uri: Uri) {
+        val estado = tabla.value
+        val titulo = nombreGrupo.value
+        viewModelScope.launch {
+            _mensaje.value = try {
+                withContext(Dispatchers.IO) {
+                    val salida = getApplication<Application>().contentResolver.openOutputStream(uri)
+                        ?: error("No se pudo abrir el archivo")
+                    salida.use { PdfTabla.generar(titulo, estado, it) }
+                }
+                "PDF guardado"
+            } catch (e: Exception) {
+                "No se pudo exportar: ${e.message}"
+            }
+        }
+    }
+    fun exportarExcel(uri: Uri) {
+        val estado = tabla.value
+        viewModelScope.launch {
+            _mensaje.value = try {
+                withContext(Dispatchers.IO) {
+                    val salida = getApplication<Application>().contentResolver.openOutputStream(uri)
+                        ?: error("No se pudo abrir el archivo")
+                    salida.use { ExcelTabla.generar(estado, it) }
+                }
+                "Excel guardado"
+            } catch (e: Exception) {
+                "No se pudo exportar: ${e.message}"
+            }
+        }
     }
 }
